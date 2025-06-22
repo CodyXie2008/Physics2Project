@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高精度碰撞动力学模拟器 V7.0 (最终版)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --panel-bg: #ffffff;
+            --primary-text: #2c3e50;
+            --secondary-text: #7f8c8d;
+            --accent-color: #2980b9;
+            --accent-hover: #3498db;
+            --border-color: #dce4ec;
+            --shadow: 0 8px 32px rgba(44, 62, 80, 0.1);
+            --highlight-color: #c0392b;
+            --grid-color: #e0e0e0;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--primary-text);
+            margin: 0;
+            padding: 2rem;
+        }
+        .main-container {
+            width: 100%;
+            max-width: 1800px;
+            margin: 0 auto;
+            display: grid;
+            /* 三栏式布局核心 */
+            grid-template-columns: 1fr 2.5fr 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+        .panel {
+            background: var(--panel-bg);
+            border-radius: 16px;
+            padding: 1.5rem 2rem;
+            box-shadow: var(--shadow);
+        }
+        h1, h2, h3 { margin-top: 0; color: var(--primary-text); font-weight: 500; }
+        h1 { font-size: 2.2rem; text-align: center; grid-column: 1 / -1; margin-bottom: 2rem; color: var(--accent-color); }
+        h2 { font-size: 1.6rem; border-bottom: 2px solid var(--accent-color); padding-bottom: 0.75rem; margin-bottom: 2rem; }
+        h3 { font-size: 1.1rem; font-weight: 500; color: var(--primary-text); margin-top: 2rem; margin-bottom: 1rem; border-left: 4px solid var(--border-color); padding-left: 1rem; }
+        
+        #collisionCanvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border-color); cursor: crosshair; }
+        
+        /* Controls & Data Styling */
+        .control-group { margin-bottom: 1.75rem; }
+        label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; font-weight: 500; font-size: 0.95rem; }
+        label span:last-child { font-weight: 700; color: var(--accent-color); }
+        input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; background: #dfe6e9; border-radius: 3px; outline: none; cursor: pointer; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; background: var(--accent-color); border-radius: 50%; cursor: pointer; border: 3px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.2s; }
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.1); }
+        select { width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background: #fff; font-size: 1rem; }
+        .buttons-group { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2rem; }
+        button { background-color: var(--accent-color); color: white; border: none; padding: 0.8rem 1rem; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 500; transition: all 0.2s; }
+        button:hover { background-color: var(--accent-hover); transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        button#resetBtn { background-color: #95a5a6; }
+        button#resetBtn:hover { background-color: #7f8c8d; }
+        .status-indicator { text-align: center; padding: 0.75rem; background-color: #ecf0f1; border-radius: 8px; margin-bottom: 2rem; font-weight: 500;}
+        .status-indicator span { font-weight: 700; }
+
+        .results-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+        .data-readout { background-color: #f8f9fa; border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; text-align: center; }
+        .data-readout .data-label { font-size: 0.9rem; color: var(--secondary-text); display: block; margin-bottom: 0.25rem; }
+        .data-readout .data-value { font-size: 1.75rem; font-weight: 700; color: var(--primary-text); }
+        .data-readout .highlight-result { color: var(--highlight-color); font-size: 2.25rem; }
+        .velocity-comparison { display: flex; justify-content: space-between; align-items: center; }
+        .velocity-comparison .arrow { font-size: 1.5rem; color: var(--secondary-text); }
+
+        @media (max-width: 1300px) {
+            body { padding: 1rem; }
+            .main-container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <h1>高精度碰撞动力学模拟器 V7.0</h1>
+        
+        <div class="panel controls-panel">
+            <h2>实验参数控制</h2>
+            <div class="status-indicator">状态: <span id="simStatus">准备就绪</span></div>
+            
+            <h3>质量设置 (kg)</h3>
+            <div class="control-group">
+                <label for="massWhite">白球质量 (m₁)<span id="massWhiteValue">1.0</span></label>
+                <input type="range" id="massWhite" min="1" max="10" value="1" step="0.5">
+            </div>
+            <div class="control-group">
+                <label for="massBlack">黑球质量 (m₂)<span id="massBlackValue">1.0</span></label>
+                <input type="range" id="massBlack" min="1" max="10" value="1" step="0.5">
+            </div>
+
+            <h3>碰撞参数</h3>
+            <div class="control-group">
+                <label for="impactOffset">碰撞偏移量 (y)<span id="offsetValue">25 px</span></label>
+                <input type="range" id="impactOffset" min="0" max="29" value="25" step="1">
+            </div>
+            <div class="control-group">
+                <label for="ballType">弹性预设</label>
+                <select id="ballType">
+                    <option value="custom">自定义</option>
+                    <option value="ideal">理想弹性 (e=1.00)</option>
+                    <option value="marble" selected>大理石 (e=0.98)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="elasticitySlider">自定义弹性系数 (e)<span id="elasticityValue">0.98</span></label>
+                <input type="range" id="elasticitySlider" min="0.5" max="1.0" step="0.01" value="0.98">
+            </div>
+            <div class="buttons-group">
+                <button id="startBtn">开始模拟</button>
+                <button id="resetBtn">重置状态</button>
+            </div>
+        </div>
+
+        <div class="panel simulation-panel">
+            <h2>模拟视窗</h2>
+            <canvas id="collisionCanvas" width="1000" height="600"></canvas>
+        </div>
+        
+        <div class="panel data-panel">
+            <h2>实时数据分析</h2>
+            <div class="results-grid">
+                <div class="data-readout">
+                    <span class="data-label">入射偏离角度</span>
+                    <span class="data-value highlight-result" id="incidentAngle">--</span>
+                </div>
+                <div class="data-readout">
+                    <span class="data-label">分离角度</span>
+                    <span class="data-value highlight-result" id="angleBetween">--</span>
+                </div>
+            </div>
+            <div class="velocity-group">
+                <h3>速度分析 (单位/帧)</h3>
+                <div class="data-readout">
+                    <span class="data-label">白球 (入射)</span>
+                    <div class="velocity-comparison">
+                        <span class="data-value" id="whiteInitialSpeed">--</span>
+                        <span class="arrow">→</span>
+                        <span class="data-value" id="whiteFinalSpeed">--</span>
+                    </div>
+                </div>
+                 <div class="data-readout" style="margin-top: 1rem;">
+                    <span class="data-label">黑球 (目标)</span>
+                    <div class="velocity-comparison">
+                        <span class="data-value" id="blackInitialSpeed">--</span>
+                         <span class="arrow">→</span>
+                        <span class="data-value" id="blackFinalSpeed">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // JavaScript代码与V6.0版本完全相同，因为所有请求都是关于HTML和CSS布局的。
+    // 为了保证完整性，在此处粘贴完整的V6.0 JS代码。
+
+    const dom = {
+        canvas: document.getElementById('collisionCanvas'),
+        impactOffset: document.getElementById('impactOffset'), offsetValue: document.getElementById('offsetValue'),
+        ballType: document.getElementById('ballType'),
+        elasticitySlider: document.getElementById('elasticitySlider'), elasticityValue: document.getElementById('elasticityValue'),
+        massWhite: document.getElementById('massWhite'), massWhiteValue: document.getElementById('massWhiteValue'),
+        massBlack: document.getElementById('massBlack'), massBlackValue: document.getElementById('massBlackValue'),
+        startBtn: document.getElementById('startBtn'), resetBtn: document.getElementById('resetBtn'),
+        incidentAngle: document.getElementById('incidentAngle'), angleBetween: document.getElementById('angleBetween'),
+        whiteInitialSpeed: document.getElementById('whiteInitialSpeed'), blackInitialSpeed: document.getElementById('blackInitialSpeed'),
+        whiteFinalSpeed: document.getElementById('whiteFinalSpeed'), blackFinalSpeed: document.getElementById('blackFinalSpeed'),
+        simStatus: document.getElementById('simStatus'),
+    };
+
+    const config = {
+        baseRadius: 15, initialSpeed: 4,
+        elasticityMap: { ideal: 1.0, marble: 0.98 }
+    };
+    
+    const ctx = dom.canvas.getContext('2d');
+    const width = dom.canvas.width, height = dom.canvas.height;
+    let state = {};
+
+    function reset() {
+        if (state.animationId) cancelAnimationFrame(state.animationId);
+        
+        const mass1 = parseFloat(dom.massWhite.value);
+        const mass2 = parseFloat(dom.massBlack.value);
+        const radius1 = config.baseRadius * Math.cbrt(mass1);
+        const radius2 = config.baseRadius * Math.cbrt(mass2);
+
+        const maxOffset = Math.floor(radius1 + radius2 - 1);
+        dom.impactOffset.max = maxOffset;
+        if (parseInt(dom.impactOffset.value) > maxOffset) dom.impactOffset.value = maxOffset;
+        
+        const offset = parseInt(dom.impactOffset.value);
+
+        state = {
+            isRunning: false, collisionOccurred: false, animationId: null,
+            offset: offset, elasticity: parseFloat(dom.elasticitySlider.value),
+            staticIncidentAngle: null,
+            whiteBall: { x: 250, y: height / 2, vx: 0, vy: 0, radius: radius1, mass: mass1, color: '#f5f5f5', path: [] },
+            blackBall: { x: width / 2 + 150, y: height / 2 + offset, vx: 0, vy: 0, radius: radius2, mass: mass2, color: '#333', path: [] }
+        };
+        
+        calculateStaticIncidentAngle();
+        updateUI();
+        draw();
+    }
+
+    // --- 事件监听 ---
+    ['massWhite', 'massBlack', 'impactOffset', 'elasticitySlider'].forEach(id => {
+        dom[id].addEventListener('input', () => { if (!state.isRunning) reset(); });
+    });
+    dom.ballType.addEventListener('change', () => {
+        const type = dom.ballType.value;
+        if (type !== 'custom') dom.elasticitySlider.value = config.elasticityMap[type];
+        if (!state.isRunning) reset();
+    });
+    dom.elasticitySlider.addEventListener('input', () => dom.ballType.value = 'custom');
+    dom.startBtn.addEventListener('click', start);
+    dom.resetBtn.addEventListener('click', reset);
+
+    // --- 核心功能 ---
+    function start() {
+        if (state.isRunning) return;
+        reset(); state.isRunning = true;
+        updateUI();
+        state.whiteBall.vx = config.initialSpeed;
+        animate();
+    }
+
+    function animate() {
+        if (state.isRunning) {
+            ['whiteBall', 'blackBall'].forEach(key => {
+                const ball = state[key];
+                if(Math.hypot(ball.vx, ball.vy) > 0.001) {
+                     ball.x += ball.vx; ball.y += ball.vy; ball.path.push({ x: ball.x, y: ball.y });
+                }
+            });
+        }
+        const dx = state.blackBall.x - state.whiteBall.x, dy = state.blackBall.y - state.whiteBall.y;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance <= state.whiteBall.radius + state.blackBall.radius && !state.collisionOccurred) {
+            state.collisionOccurred = true; 
+            handleCollision(dx, dy);
+            updateUI();
+        }
+        draw();
+        if (state.whiteBall.path.length > 800) {
+            state.isRunning = false;
+            updateUI();
+        }
+        if (state.isRunning) state.animationId = requestAnimationFrame(animate);
+    }
+        
+    function handleCollision(dx, dy) {
+        const { whiteBall: b1, blackBall: b2, elasticity: e } = state;
+        const distance = Math.hypot(dx, dy);
+        const nx = dx / distance, ny = dy / distance, tx = -ny, ty = nx;
+        const v1n = b1.vx * nx + b1.vy * ny, v1t = b1.vx * tx + b1.vy * ty;
+        const v2n = b2.vx * nx + b2.vy * ny, v2t = b2.vx * tx + b2.vy * ty;
+        const v1n_after = (v1n * (b1.mass - e * b2.mass) + v2n * (1 + e) * b2.mass) / (b1.mass + b2.mass);
+        const v2n_after = (v1n * (1 + e) * b1.mass + v2n * (b2.mass - e * b1.mass)) / (b1.mass + b2.mass);
+        b1.vx = v1n_after * nx + v1t * tx; b1.vy = v1n_after * ny + v1t * ty;
+        b2.vx = v2n_after * nx + v2t * tx; b2.vy = v2n_after * ny + v2t * ty;
+    }
+
+    function calculateStaticIncidentAngle() {
+        if(state.offset === 0) { state.staticIncidentAngle = 0; return; }
+        const dx = state.blackBall.x - state.whiteBall.x;
+        const dy = state.blackBall.y - state.whiteBall.y;
+        const angleRad = Math.acos(dx / Math.hypot(dx, dy));
+        state.staticIncidentAngle = angleRad * 180 / Math.PI;
+    }
+
+    // --- 绘图与UI ---
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+        drawGrid();
+        drawTrajectories();
+        if (!state.isRunning) drawPreCollisionGuides();
+        drawBall(state.whiteBall);
+        drawBall(state.blackBall);
+    }
+    
+    function drawGrid() {
+        ctx.save();
+        ctx.strokeStyle = "var(--grid-color)";
+        ctx.lineWidth = 0.5;
+        for (let x = 0; x < width; x += 50) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+        }
+        for (let y = 0; y < height; y += 50) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+        }
+        ctx.restore();
+    }
+    
+    function drawTrajectories() {
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ['whiteBall', 'blackBall'].forEach((key, index) => {
+            const ball = state[key];
+            if (ball.path.length < 2) return;
+            ctx.beginPath();
+            ctx.moveTo(ball.path[0].x, ball.path[0].y);
+            for (let i = 1; i < ball.path.length; i++) ctx.lineTo(ball.path[i].x, ball.path[i].y);
+            ctx.strokeStyle = index === 0 ? 'rgba(231, 76, 60, 0.7)' : 'rgba(41, 128, 185, 0.7)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        });
+        ctx.restore();
+    }
+    
+    function drawPreCollisionGuides() {
+        const w = state.whiteBall, b = state.blackBall;
+        ctx.save();
+        ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.lineTo(b.x, w.y);
+        ctx.strokeStyle = "rgba(46, 204, 113, 0.8)"; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.lineTo(b.x, b.y);
+        ctx.strokeStyle = "rgba(243, 156, 18, 0.8)"; ctx.stroke();
+        if (state.staticIncidentAngle > 1) {
+            const angleRad = state.staticIncidentAngle * Math.PI / 180;
+            ctx.beginPath(); ctx.arc(w.x, w.y, 40, 0, -angleRad, true);
+            ctx.strokeStyle = "rgba(44, 62, 80, 0.8)"; ctx.stroke();
+            ctx.fillStyle = '#2c3e50'; ctx.font = '14px Roboto';
+            ctx.fillText(`${state.staticIncidentAngle.toFixed(1)}°`, w.x + 45, w.y - 15);
+        }
+        ctx.restore();
+    }
+
+    function drawBall(ball) {
+        ctx.save();
+        ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.fillStyle = ball.color;
+        ctx.shadowColor = 'rgba(0,0,0,0.2)'; ctx.shadowBlur = 5; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+        ctx.fill();
+        ctx.shadowColor = 'transparent';
+        ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = '#7f8c8d'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.restore();
+    }
+    
+    function updateUI() {
+        dom.massWhiteValue.textContent = parseFloat(dom.massWhite.value).toFixed(1);
+        dom.massBlackValue.textContent = parseFloat(dom.massBlack.value).toFixed(1);
+        dom.offsetValue.textContent = `${state.offset} px`;
+        dom.elasticityValue.textContent = state.elasticity.toFixed(2);
+        
+        if(state.isRunning) { dom.simStatus.textContent = "模拟中..."; }
+        else if(state.collisionOccurred) { dom.simStatus.textContent = "模拟完成"; }
+        else { dom.simStatus.textContent = "准备就绪"; }
+        
+        dom.whiteInitialSpeed.textContent = `${config.initialSpeed.toFixed(2)}`;
+        dom.blackInitialSpeed.textContent = `0.00`;
+
+        if (state.staticIncidentAngle !== null) {
+            dom.incidentAngle.textContent = `${state.staticIncidentAngle.toFixed(2)}°`;
+        }
+
+        if (state.collisionOccurred) {
+            const w_speed = Math.hypot(state.whiteBall.vx, state.whiteBall.vy);
+            const b_speed = Math.hypot(state.blackBall.vx, state.blackBall.vy);
+            
+            dom.whiteFinalSpeed.textContent = `${w_speed.toFixed(2)}`;
+            dom.blackFinalSpeed.textContent = `${b_speed.toFixed(2)}`;
+            
+            if (w_speed > 0.01 && b_speed > 0.01) {
+                const dot = state.whiteBall.vx * state.blackBall.vx + state.whiteBall.vy * state.blackBall.vy;
+                const angleRad = Math.acos(dot / (w_speed * b_speed));
+                dom.angleBetween.textContent = `${(angleRad * 180 / Math.PI).toFixed(2)}°`;
+            } else { dom.angleBetween.textContent = "N/A"; }
+        } else {
+            dom.angleBetween.textContent = '--';
+            dom.whiteFinalSpeed.textContent = '--';
+            dom.blackFinalSpeed.textContent = '--';
+        }
+    }
+    
+    reset();
+</script>
+</body>
+</html>
