@@ -3,157 +3,199 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高精度碰撞动力学模拟器 V7.0 (最终版)</title>
+    <title>高精度碰撞动力学模拟器 V21.0 (最终修复与优化版)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-color: #f4f6f9;
-            --panel-bg: #ffffff;
+            --panel-bg: rgba(255, 255, 255, 0.97);
+            --header-bg: #ffffff;
             --primary-text: #2c3e50;
             --secondary-text: #7f8c8d;
-            --accent-color: #2980b9;
-            --accent-hover: #3498db;
-            --border-color: #dce4ec;
+            --accent-color: #3498db;
+            --accent-hover: #5dade2;
+            --border-color: #e3e8ec;
             --shadow: 0 8px 32px rgba(44, 62, 80, 0.1);
-            --highlight-color: #c0392b;
-            --grid-color: #e0e0e0;
+            --grid-color: #eaf0f2;
+            --highlight-color: #e74c3c;
         }
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
         body {
             font-family: 'Roboto', sans-serif;
             background-color: var(--bg-color);
+            background-image: linear-gradient(var(--grid-color) 1px, transparent 1px), linear-gradient(to right, var(--grid-color) 1px, var(--bg-color) 1px);
+            background-size: 25px 25px;
             color: var(--primary-text);
-            margin: 0;
-            padding: 2rem;
         }
         .main-container {
-            width: 100%;
-            max-width: 1800px;
-            margin: 0 auto;
+            width: 100%; height: 100%;
+            padding: 1.5rem; box-sizing: border-box;
             display: grid;
-            /* 三栏式布局核心 */
-            grid-template-columns: 1fr 2.5fr 1fr;
-            gap: 2rem;
-            align-items: start;
+            grid-template-columns: 360px 1fr 360px;
+            grid-template-rows: auto minmax(0, 1fr);
+            gap: 1.5rem;
+            align-items: stretch;
         }
+        .main-container.windowed-mode { display: block; position: relative; }
+        
+        .main-header { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem; }
+        h1 { font-size: 1.8rem; margin: 0; color: var(--primary-text); }
+        
         .panel {
             background: var(--panel-bg);
             border-radius: 16px;
-            padding: 1.5rem 2rem;
             box-shadow: var(--shadow);
+            display: flex; flex-direction: column;
+            transition: all 0.3s ease;
+            contain: layout;
+            border: 1px solid var(--border-color);
         }
-        h1, h2, h3 { margin-top: 0; color: var(--primary-text); font-weight: 500; }
-        h1 { font-size: 2.2rem; text-align: center; grid-column: 1 / -1; margin-bottom: 2rem; color: var(--accent-color); }
-        h2 { font-size: 1.6rem; border-bottom: 2px solid var(--accent-color); padding-bottom: 0.75rem; margin-bottom: 2rem; }
-        h3 { font-size: 1.1rem; font-weight: 500; color: var(--primary-text); margin-top: 2rem; margin-bottom: 1rem; border-left: 4px solid var(--border-color); padding-left: 1rem; }
+        .windowed-mode .panel {
+            position: absolute; backdrop-filter: blur(12px);
+        }
+        .panel-header {
+            background-color: var(--header-bg); padding: 0.75rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            border-radius: 16px 16px 0 0;
+            display: flex; justify-content: space-between; align-items: center;
+            user-select: none;
+        }
+        .windowed-mode .panel-header { cursor: move; }
+        .windowed-mode .panel.is-dragging, .windowed-mode .panel-header:hover { background-color: #e9eef1; }
+        .panel-header h2 { font-size: 1.1rem; margin: 0; font-weight: 500; display: flex; align-items: center; gap: 0.75rem;}
+        .panel-icon { width: 20px; height: 20px; color: var(--accent-color); }
+        .panel-content { padding: 1.5rem; overflow: auto; flex-grow: 1; }
         
-        #collisionCanvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border-color); cursor: crosshair; }
+        .window-controls { display: none; }
+        .windowed-mode .window-controls { display: flex; gap: 0.6rem; }
+        .win-btn { width: 14px; height: 14px; border-radius: 50%; border: none; cursor: pointer; }
+        .win-btn.dock { background-color: #ff5f57; }
+        .win-btn.minimize { background-color: #ffbd2e; }
+        .win-btn.maximize { background-color: #28c940; }
+
+        .resize-handle { display: none; position: absolute; right: 0; bottom: 0; width: 20px; height: 20px; cursor: nwse-resize; z-index: 1; border-bottom: 3px solid var(--accent-color); border-right: 3px solid var(--accent-color); border-bottom-right-radius: 12px; opacity: 0.5; }
+        .resize-handle:hover { opacity: 1; }
+        .windowed-mode .panel .resize-handle { display: block; }
+        .panel.is-minimized .panel-content, .panel.is-minimized .resize-handle { display: none; }
+        .panel.is-minimized { height: auto !important; min-height: 0; resize: none; }
+        .panel.is-maximized { left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; border-radius: 0; z-index: 1000 !important; }
         
-        /* Controls & Data Styling */
-        .control-group { margin-bottom: 1.75rem; }
-        label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; font-weight: 500; font-size: 0.95rem; }
-        label span:last-child { font-weight: 700; color: var(--accent-color); }
-        input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; background: #dfe6e9; border-radius: 3px; outline: none; cursor: pointer; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; background: var(--accent-color); border-radius: 50%; cursor: pointer; border: 3px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.2s; }
-        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.1); }
-        select { width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background: #fff; font-size: 1rem; }
-        .buttons-group { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2rem; }
+        #controls-panel { grid-area: 2 / 1 / 3 / 2; }
+        #simulation-panel { grid-area: 2 / 2 / 3 / 3; }
+        #data-panel { grid-area: 2 / 3 / 3 / 4; }
+        
+        #collisionCanvas, #vectorCanvas { width: 100%; height: 100%; display: block; }
+        #simulation-panel .panel-content { padding: 0; overflow: hidden; border-radius: 0 0 16px 16px; }
+        #vectorCanvas { border: 1px solid var(--border-color); border-radius: 8px; background: #fdfdfd;}
+
+        .control-card { background: #f8f9fa; border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 1rem; }
+        .control-card-title { font-weight: 500; font-size: 1.1rem; padding: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .control-card-title:hover { background: #f1f3f5; }
+        .control-card-title::after { content: '▼'; font-size: 0.8em; transition: transform 0.3s ease; }
+        .control-card.is-open .control-card-title::after { transform: rotate(180deg); }
+        .control-card-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-in-out; }
+        .control-card.is-open .control-card-content { max-height: 500px; padding: 0.5rem 1rem 1.5rem 1rem; border-top: 1px solid var(--border-color);}
+        
+        label { display: flex; justify-content: space-between; align-items: center; margin: 1rem 0 0.75rem 0; font-weight: 400; font-size: 0.95rem; }
+        label span:last-child { font-weight: 700; color: var(--accent-color); font-family: 'Roboto Mono', monospace; min-width: 55px; text-align: right; }
         button { background-color: var(--accent-color); color: white; border: none; padding: 0.8rem 1rem; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 500; transition: all 0.2s; }
-        button:hover { background-color: var(--accent-hover); transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        button:hover { background-color: var(--accent-hover); }
+        button:active { transform: scale(0.98); }
+        .buttons-group { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }
         button#resetBtn { background-color: #95a5a6; }
-        button#resetBtn:hover { background-color: #7f8c8d; }
-        .status-indicator { text-align: center; padding: 0.75rem; background-color: #ecf0f1; border-radius: 8px; margin-bottom: 2rem; font-weight: 500;}
-        .status-indicator span { font-weight: 700; }
-
-        .results-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+        .status-indicator { text-align: center; padding: 0.75rem; background-color: #ecf0f1; border-radius: 8px; margin-bottom: 1.5rem; font-weight: 500;}
         .data-readout { background-color: #f8f9fa; border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; text-align: center; }
-        .data-readout .data-label { font-size: 0.9rem; color: var(--secondary-text); display: block; margin-bottom: 0.25rem; }
-        .data-readout .data-value { font-size: 1.75rem; font-weight: 700; color: var(--primary-text); }
-        .data-readout .highlight-result { color: var(--highlight-color); font-size: 2.25rem; }
-        .velocity-comparison { display: flex; justify-content: space-between; align-items: center; }
-        .velocity-comparison .arrow { font-size: 1.5rem; color: var(--secondary-text); }
-
-        @media (max-width: 1300px) {
-            body { padding: 1rem; }
-            .main-container { grid-template-columns: 1fr; }
+        .data-label { font-size: 0.9rem; color: var(--secondary-text); }
+        .data-value { font-family: 'Roboto Mono', monospace; font-size: 1.5rem; font-weight: 500; }
+        .highlight-result { color: var(--highlight-color); font-size: 2rem; }
+        .velocity-comparison { display: flex; justify-content: space-between; align-items: center; padding: 0 0.5rem;}
+        .arrow { font-size: 1.5rem; color: var(--secondary-text); }
+        
+        @media (max-width: 1400px) {
+            body { overflow: auto; }
+            .main-container { display: flex; flex-direction: column; height: auto; }
+            .panel { margin-bottom: 1.5rem; }
         }
     </style>
 </head>
 <body>
-    <div class="main-container">
-        <h1>高精度碰撞动力学模拟器 V7.0</h1>
-        
-        <div class="panel controls-panel">
-            <h2>实验参数控制</h2>
-            <div class="status-indicator">状态: <span id="simStatus">准备就绪</span></div>
-            
-            <h3>质量设置 (kg)</h3>
-            <div class="control-group">
-                <label for="massWhite">白球质量 (m₁)<span id="massWhiteValue">1.0</span></label>
-                <input type="range" id="massWhite" min="1" max="10" value="1" step="0.5">
-            </div>
-            <div class="control-group">
-                <label for="massBlack">黑球质量 (m₂)<span id="massBlackValue">1.0</span></label>
-                <input type="range" id="massBlack" min="1" max="10" value="1" step="0.5">
-            </div>
-
-            <h3>碰撞参数</h3>
-            <div class="control-group">
-                <label for="impactOffset">碰撞偏移量 (y)<span id="offsetValue">25 px</span></label>
-                <input type="range" id="impactOffset" min="0" max="29" value="25" step="1">
-            </div>
-            <div class="control-group">
-                <label for="ballType">弹性预设</label>
-                <select id="ballType">
-                    <option value="custom">自定义</option>
-                    <option value="ideal">理想弹性 (e=1.00)</option>
-                    <option value="marble" selected>大理石 (e=0.98)</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="elasticitySlider">自定义弹性系数 (e)<span id="elasticityValue">0.98</span></label>
-                <input type="range" id="elasticitySlider" min="0.5" max="1.0" step="0.01" value="0.98">
-            </div>
-            <div class="buttons-group">
-                <button id="startBtn">开始模拟</button>
-                <button id="resetBtn">重置状态</button>
-            </div>
+    <div class="main-container" id="mainContainer">
+        <div class="main-header">
+            <h1>动力学模拟器 V21.0</h1>
+            <button id="layoutToggleBtn" title="在固定网格布局和可自由拖拽的窗口布局间切换">切换为窗口布局</button>
         </div>
 
-        <div class="panel simulation-panel">
-            <h2>模拟视窗</h2>
-            <canvas id="collisionCanvas" width="1000" height="600"></canvas>
-        </div>
-        
-        <div class="panel data-panel">
-            <h2>实时数据分析</h2>
-            <div class="results-grid">
-                <div class="data-readout">
-                    <span class="data-label">入射偏离角度</span>
-                    <span class="data-value highlight-result" id="incidentAngle">--</span>
-                </div>
-                <div class="data-readout">
-                    <span class="data-label">分离角度</span>
-                    <span class="data-value highlight-result" id="angleBetween">--</span>
-                </div>
-            </div>
-            <div class="velocity-group">
-                <h3>速度分析 (单位/帧)</h3>
-                <div class="data-readout">
-                    <span class="data-label">白球 (入射)</span>
-                    <div class="velocity-comparison">
-                        <span class="data-value" id="whiteInitialSpeed">--</span>
-                        <span class="arrow">→</span>
-                        <span class="data-value" id="whiteFinalSpeed">--</span>
+        <div class="panel" id="controls-panel">
+            <div class="panel-header"><h2><svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>参数控制</h2><div class="window-controls"><button class="win-btn minimize" data-target="controls-panel"></button><button class="win-btn maximize" data-target="controls-panel"></button><button class="win-btn dock" data-target="controls-panel"></button></div></div>
+            <div class="panel-content">
+                <div class="status-indicator">状态: <span id="simStatus">准备就绪</span></div>
+                <div class="control-card is-open">
+                    <div class="control-card-title">质量设置</div>
+                    <div class="control-card-content">
+                        <div class="control-group">
+                            <label>白球质量 (m₁)<span id="massWhiteValue">1.0</span></label>
+                            <input type="range" id="massWhite" min="1" max="10" value="1" step="0.5">
+                        </div>
+                        <div class="control-group">
+                            <label>黑球质量 (m₂)<span id="massBlackValue">1.0</span></label>
+                            <input type="range" id="massBlack" min="1" max="10" value="1" step="0.5">
+                        </div>
                     </div>
                 </div>
-                 <div class="data-readout" style="margin-top: 1rem;">
-                    <span class="data-label">黑球 (目标)</span>
-                    <div class="velocity-comparison">
-                        <span class="data-value" id="blackInitialSpeed">--</span>
-                         <span class="arrow">→</span>
-                        <span class="data-value" id="blackFinalSpeed">--</span>
+                <div class="control-card is-open">
+                    <div class="control-card-title">碰撞参数</div>
+                    <div class="control-card-content">
+                        <div class="control-group">
+                            <label>碰撞偏移量 (y)<span id="offsetValue">25 px</span></label>
+                            <input type="range" id="impactOffset" min="0" max="29" value="25" step="1" title="设置黑球相对于白球的垂直偏移">
+                        </div>
+                        <div class="control-group">
+                            <label>弹性系数 (e)<span id="elasticityValue">0.98</span></label>
+                            <input type="range" id="elasticitySlider" min="0.5" max="1.0" step="0.01" value="0.98" title="1.0为完全弹性碰撞">
+                        </div>
+                    </div>
+                </div>
+                <div class="buttons-group">
+                    <button id="startBtn">开始模拟</button>
+                    <button id="resetBtn">重置状态</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" id="simulation-panel">
+            <div class="panel-header"><h2><svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>模拟视窗</h2><div class="window-controls"><button class="win-btn minimize" data-target="simulation-panel"></button><button class="win-btn maximize" data-target="simulation-panel"></button><button class="win-btn dock" data-target="simulation-panel"></button></div></div>
+            <div class="panel-content"><canvas id="collisionCanvas"></canvas></div>
+        </div>
+
+        <div class="panel" id="data-panel">
+            <div class="panel-header"><h2><svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>数据与分析</h2><div class="window-controls"><button class="win-btn minimize" data-target="data-panel"></button><button class="win-btn maximize" data-target="data-panel"></button><button class="win-btn dock" data-target="data-panel"></button></div></div>
+            <div class="panel-content">
+                <div class="control-card is-open">
+                    <div class="control-card-title">核心指标</div>
+                    <div class="control-card-content" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="data-readout"><span class="data-label">入射偏离角</span><span class="data-value highlight-result" id="incidentAngle">--</span></div>
+                        <div class="data-readout"><span class="data-label">分离角</span><span class="data-value highlight-result" id="angleBetween">--</span></div>
+                    </div>
+                </div>
+                 <div class="control-card is-open">
+                    <div class="control-card-title">速度分析</div>
+                    <div class="control-card-content">
+                        <div class="data-readout">
+                            <span class="data-label">白球: 前 → 后</span>
+                            <div class="velocity-comparison"><span class="data-value" id="whiteInitialSpeed">--</span><span class="arrow">→</span><span class="data-value" id="whiteFinalSpeed">--</span></div>
+                        </div>
+                         <div class="data-readout" style="margin-top: 1rem;">
+                            <span class="data-label">黑球: 前 → 后</span>
+                            <div class="velocity-comparison"><span class="data-value" id="blackInitialSpeed">--</span><span class="arrow">→</span><span class="data-value" id="blackFinalSpeed">--</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="control-card is-open">
+                    <div class="control-card-title">速度矢量三角形</div>
+                    <div class="control-card-content">
+                        <canvas id="vectorCanvas" width="300" height="220"></canvas>
                     </div>
                 </div>
             </div>
@@ -161,13 +203,16 @@
     </div>
 
 <script>
-    // JavaScript代码与V6.0版本完全相同，因为所有请求都是关于HTML和CSS布局的。
-    // 为了保证完整性，在此处粘贴完整的V6.0 JS代码。
-
+// V21.0: Final UI and Bug Fixes.
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. DOM & CONFIG
     const dom = {
+        mainContainer: document.getElementById('mainContainer'),
+        layoutToggleBtn: document.getElementById('layoutToggleBtn'),
+        panels: document.querySelectorAll('.panel'),
         canvas: document.getElementById('collisionCanvas'),
+        vectorCanvas: document.getElementById('vectorCanvas'),
         impactOffset: document.getElementById('impactOffset'), offsetValue: document.getElementById('offsetValue'),
-        ballType: document.getElementById('ballType'),
         elasticitySlider: document.getElementById('elasticitySlider'), elasticityValue: document.getElementById('elasticityValue'),
         massWhite: document.getElementById('massWhite'), massWhiteValue: document.getElementById('massWhiteValue'),
         massBlack: document.getElementById('massBlack'), massBlackValue: document.getElementById('massBlackValue'),
@@ -177,24 +222,34 @@
         whiteFinalSpeed: document.getElementById('whiteFinalSpeed'), blackFinalSpeed: document.getElementById('blackFinalSpeed'),
         simStatus: document.getElementById('simStatus'),
     };
-
-    const config = {
-        baseRadius: 15, initialSpeed: 4,
-        elasticityMap: { ideal: 1.0, marble: 0.98 }
-    };
-    
+    const config = { baseRadius: 15, initialSpeed: 4 };
     const ctx = dom.canvas.getContext('2d');
-    const width = dom.canvas.width, height = dom.canvas.height;
+    const vectorCtx = dom.vectorCanvas.getContext('2d');
     let state = {};
+    let windowStates = {};
+
+    // 2. CORE SIMULATION LOGIC (Stable, from previous versions)
+    function setupCanvasSize(canvas) {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return { width: 0, height: 0};
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        const canvasCtx = canvas.getContext('2d');
+        canvasCtx.scale(dpr, dpr);
+        return { width: rect.width, height: rect.height };
+    }
 
     function reset() {
         if (state.animationId) cancelAnimationFrame(state.animationId);
         
-        const mass1 = parseFloat(dom.massWhite.value);
-        const mass2 = parseFloat(dom.massBlack.value);
-        const radius1 = config.baseRadius * Math.cbrt(mass1);
-        const radius2 = config.baseRadius * Math.cbrt(mass2);
+        const simCanvasSize = setupCanvasSize(dom.canvas);
+        if(simCanvasSize.width === 0) return;
+        const {width, height} = simCanvasSize;
 
+        const mass1 = parseFloat(dom.massWhite.value), mass2 = parseFloat(dom.massBlack.value);
+        const radius1 = config.baseRadius * Math.cbrt(mass1), radius2 = config.baseRadius * Math.cbrt(mass2);
+        
         const maxOffset = Math.floor(radius1 + radius2 - 1);
         dom.impactOffset.max = maxOffset;
         if (parseInt(dom.impactOffset.value) > maxOffset) dom.impactOffset.value = maxOffset;
@@ -205,46 +260,40 @@
             isRunning: false, collisionOccurred: false, animationId: null,
             offset: offset, elasticity: parseFloat(dom.elasticitySlider.value),
             staticIncidentAngle: null,
-            whiteBall: { x: 250, y: height / 2, vx: 0, vy: 0, radius: radius1, mass: mass1, color: '#f5f5f5', path: [] },
-            blackBall: { x: width / 2 + 150, y: height / 2 + offset, vx: 0, vy: 0, radius: radius2, mass: mass2, color: '#333', path: [] }
+            whiteBall: { x: width / 4, y: height / 2, vx: 0, vy: 0, radius: radius1, mass: mass1, color: '#f5f5f5', path: [] },
+            blackBall: { x: width / 2 + 50, y: height / 2 + offset, vx: 0, vy: 0, radius: radius2, mass: mass2, color: '#333', path: [] },
+            simWidth: width, simHeight: height
         };
         
+        vectorCtx.clearRect(0, 0, dom.vectorCanvas.width, dom.vectorCanvas.height);
         calculateStaticIncidentAngle();
         updateUI();
         draw();
     }
-
-    // --- 事件监听 ---
-    ['massWhite', 'massBlack', 'impactOffset', 'elasticitySlider'].forEach(id => {
-        dom[id].addEventListener('input', () => { if (!state.isRunning) reset(); });
-    });
-    dom.ballType.addEventListener('change', () => {
-        const type = dom.ballType.value;
-        if (type !== 'custom') dom.elasticitySlider.value = config.elasticityMap[type];
-        if (!state.isRunning) reset();
-    });
-    dom.elasticitySlider.addEventListener('input', () => dom.ballType.value = 'custom');
-    dom.startBtn.addEventListener('click', start);
-    dom.resetBtn.addEventListener('click', reset);
-
-    // --- 核心功能 ---
+    
     function start() {
         if (state.isRunning) return;
-        reset(); state.isRunning = true;
+        state.isRunning = true;
+        state.collisionOccurred = false;
+        state.whiteBall.path = []; state.blackBall.path = [];
+        state.whiteBall.x = state.simWidth / 4; state.whiteBall.y = state.simHeight / 2;
+        state.blackBall.x = state.simWidth / 2 + 50; state.blackBall.y = state.simHeight / 2 + state.offset;
+        state.whiteBall.vx = config.initialSpeed; state.whiteBall.vy = 0;
+        state.blackBall.vx = 0; state.blackBall.vy = 0;
         updateUI();
-        state.whiteBall.vx = config.initialSpeed;
         animate();
     }
 
     function animate() {
-        if (state.isRunning) {
-            ['whiteBall', 'blackBall'].forEach(key => {
-                const ball = state[key];
-                if(Math.hypot(ball.vx, ball.vy) > 0.001) {
-                     ball.x += ball.vx; ball.y += ball.vy; ball.path.push({ x: ball.x, y: ball.y });
-                }
-            });
-        }
+        if (!state.isRunning) return;
+        
+        ['whiteBall', 'blackBall'].forEach(key => {
+            const ball = state[key];
+            if(Math.hypot(ball.vx, ball.vy) > 0.001) {
+                 ball.x += ball.vx; ball.y += ball.vy; ball.path.push({ x: ball.x, y: ball.y });
+            }
+        });
+        
         const dx = state.blackBall.x - state.whiteBall.x, dy = state.blackBall.y - state.whiteBall.y;
         const distance = Math.hypot(dx, dy);
 
@@ -252,15 +301,20 @@
             state.collisionOccurred = true; 
             handleCollision(dx, dy);
             updateUI();
+            drawVectorTriangle();
         }
-        draw();
-        if (state.whiteBall.path.length > 800) {
-            state.isRunning = false;
-            updateUI();
-        }
-        if (state.isRunning) state.animationId = requestAnimationFrame(animate);
-    }
         
+        draw();
+        
+        if (state.whiteBall.path.length > 1000 || (isOutOfBounds(state.whiteBall) && (state.blackBall.path.length === 0 || isOutOfBounds(state.blackBall))) ) { 
+            state.isRunning = false; updateUI(); 
+        } else {
+            state.animationId = requestAnimationFrame(animate);
+        }
+    }
+
+    function isOutOfBounds(ball) { return ball.x < -ball.radius * 2 || ball.x > state.simWidth + ball.radius * 2; }
+
     function handleCollision(dx, dy) {
         const { whiteBall: b1, blackBall: b2, elasticity: e } = state;
         const distance = Math.hypot(dx, dy);
@@ -274,36 +328,31 @@
     }
 
     function calculateStaticIncidentAngle() {
+        if(!state.blackBall || !state.whiteBall) return;
         if(state.offset === 0) { state.staticIncidentAngle = 0; return; }
         const dx = state.blackBall.x - state.whiteBall.x;
         const dy = state.blackBall.y - state.whiteBall.y;
         const angleRad = Math.acos(dx / Math.hypot(dx, dy));
         state.staticIncidentAngle = angleRad * 180 / Math.PI;
     }
-
-    // --- 绘图与UI ---
+    
+    // 3. DRAWING & UI FUNCTIONS
     function draw() {
-        ctx.clearRect(0, 0, width, height);
+        if(!state.simWidth) return;
+        ctx.clearRect(0, 0, state.simWidth, state.simHeight);
         drawGrid();
         drawTrajectories();
         if (!state.isRunning) drawPreCollisionGuides();
         drawBall(state.whiteBall);
         drawBall(state.blackBall);
     }
-    
     function drawGrid() {
         ctx.save();
-        ctx.strokeStyle = "var(--grid-color)";
-        ctx.lineWidth = 0.5;
-        for (let x = 0; x < width; x += 50) {
-            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
-        }
-        for (let y = 0; y < height; y += 50) {
-            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
-        }
+        ctx.strokeStyle = "var(--grid-color)"; ctx.lineWidth = 1;
+        for (let x = 0; x < state.simWidth; x += 50) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, state.simHeight); ctx.stroke(); }
+        for (let y = 0; y < state.simHeight; y += 50) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(state.simWidth, y); ctx.stroke(); }
         ctx.restore();
     }
-    
     function drawTrajectories() {
         ctx.save();
         ctx.setLineDash([4, 4]);
@@ -313,13 +362,12 @@
             ctx.beginPath();
             ctx.moveTo(ball.path[0].x, ball.path[0].y);
             for (let i = 1; i < ball.path.length; i++) ctx.lineTo(ball.path[i].x, ball.path[i].y);
-            ctx.strokeStyle = index === 0 ? 'rgba(231, 76, 60, 0.7)' : 'rgba(41, 128, 185, 0.7)';
+            ctx.strokeStyle = index === 0 ? 'rgba(192, 57, 43, 0.7)' : 'rgba(41, 128, 185, 0.7)';
             ctx.lineWidth = 1.5;
             ctx.stroke();
         });
         ctx.restore();
     }
-    
     function drawPreCollisionGuides() {
         const w = state.whiteBall, b = state.blackBall;
         ctx.save();
@@ -337,7 +385,6 @@
         }
         ctx.restore();
     }
-
     function drawBall(ball) {
         ctx.save();
         ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
@@ -348,6 +395,55 @@
         ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
         ctx.strokeStyle = '#7f8c8d'; ctx.lineWidth = 1; ctx.stroke();
         ctx.restore();
+    }
+    function drawVector(ctx, start, vec, scale, color, label) {
+        const end = { x: start.x + vec.x * scale, y: start.y + vec.y * scale };
+        ctx.save();
+        ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(end.x, end.y); ctx.stroke();
+        const angle = Math.atan2(vec.y * scale, vec.x * scale);
+        ctx.beginPath();
+        ctx.moveTo(end.x, end.y);
+        ctx.lineTo(end.x - 10 * Math.cos(angle - Math.PI / 6), end.y - 10 * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(end.x - 10 * Math.cos(angle + Math.PI / 6), end.y - 10 * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = color; ctx.font = "bold 14px Roboto";
+        ctx.fillText(label, start.x + vec.x * scale * 0.5 + 5, start.y + vec.y * scale * 0.5 - 8);
+        ctx.restore();
+    }
+    function drawVectorTriangle() {
+        if (!state.collisionOccurred) return;
+        const vCanvasSize = setupCanvasSize(dom.vectorCanvas);
+        vectorCtx.clearRect(0, 0, vCanvasSize.width, vCanvasSize.height);
+        
+        const v1 = { x: config.initialSpeed, y: 0 };
+        const v1_prime = { x: state.whiteBall.vx, y: state.whiteBall.vy };
+        const v2_prime = { x: state.blackBall.vx, y: state.blackBall.vy };
+        
+        const scale = 20;
+        const origin = { x: 40, y: vCanvasSize.height / 2 };
+        
+        const v1_prime_end = { x: origin.x + v1_prime.x * scale, y: origin.y + v1_prime.y * scale };
+        drawVector(vectorCtx, origin, v1_prime, scale, "#c0392b", "V'₁");
+        drawVector(vectorCtx, v1_prime_end, v2_prime, scale, "#27ae60", "V'₂");
+        drawVector(vectorCtx, origin, v1, scale, "#3498db", "V₁");
+
+        const angleDeg = parseFloat(dom.angleBetween.textContent);
+        if (Math.abs(angleDeg - 90) < 2 && Math.abs(state.whiteBall.mass - state.blackBall.mass) < 0.1 && state.elasticity > 0.98) {
+            vectorCtx.save();
+            vectorCtx.strokeStyle = "rgba(44, 62, 80, 0.7)";
+            vectorCtx.lineWidth = 1.5;
+            const size = 10;
+            vectorCtx.translate(v1_prime_end.x, v1_prime_end.y);
+            vectorCtx.rotate(Math.atan2(v1_prime.y, v1_prime.x));
+            vectorCtx.beginPath();
+            vectorCtx.moveTo(0, size);
+            vectorCtx.lineTo(size, size);
+            vectorCtx.lineTo(size, 0);
+            vectorCtx.stroke();
+            vectorCtx.restore();
+        }
     }
     
     function updateUI() {
@@ -363,9 +459,7 @@
         dom.whiteInitialSpeed.textContent = `${config.initialSpeed.toFixed(2)}`;
         dom.blackInitialSpeed.textContent = `0.00`;
 
-        if (state.staticIncidentAngle !== null) {
-            dom.incidentAngle.textContent = `${state.staticIncidentAngle.toFixed(2)}°`;
-        }
+        if (state.staticIncidentAngle !== null) { dom.incidentAngle.textContent = `${state.staticIncidentAngle.toFixed(2)}°`; }
 
         if (state.collisionOccurred) {
             const w_speed = Math.hypot(state.whiteBall.vx, state.whiteBall.vy);
@@ -376,7 +470,7 @@
             
             if (w_speed > 0.01 && b_speed > 0.01) {
                 const dot = state.whiteBall.vx * state.blackBall.vx + state.whiteBall.vy * state.blackBall.vy;
-                const angleRad = Math.acos(dot / (w_speed * b_speed));
+                const angleRad = Math.acos(Math.max(-1, Math.min(1, dot / (w_speed * b_speed))));
                 dom.angleBetween.textContent = `${(angleRad * 180 / Math.PI).toFixed(2)}°`;
             } else { dom.angleBetween.textContent = "N/A"; }
         } else {
@@ -386,7 +480,137 @@
         }
     }
     
+    // --- 4. WINDOWING LOGIC ---
+    let activePanel = null, isResizing = false;
+    let dragStartX, dragStartY, initialX, initialY, initialW, initialH;
+
+    dom.layoutToggleBtn.addEventListener('click', () => {
+        const isWindowed = dom.mainContainer.classList.toggle('windowed-mode');
+        dom.layoutToggleBtn.textContent = isWindowed ? '切换为网格布局' : '切换为窗口布局';
+        if (isWindowed) {
+            if (Object.keys(windowStates).length === 0 || windowStates[dom.panels[0].id] === undefined) {
+                dom.panels.forEach(panel => {
+                    const rect = panel.getBoundingClientRect();
+                    windowStates[panel.id] = { x: rect.left, y: rect.top, width: rect.width, height: rect.height, z: 10 };
+                });
+            }
+            dom.panels.forEach(p => undockPanel(p));
+        } else {
+            dom.panels.forEach(p => dockPanel(p));
+        }
+        reset();
+    });
+
+    dom.panels.forEach(panel => {
+        const header = panel.querySelector('.panel-header');
+        const resizeHandle = document.createElement('div');
+        resizeHandle.className = 'resize-handle';
+        panel.appendChild(resizeHandle);
+        header.addEventListener('mousedown', e => startMove(e, panel, false));
+        resizeHandle.addEventListener('mousedown', e => startMove(e, panel, true));
+        panel.addEventListener('mousedown', () => bringToFront(panel));
+        panel.querySelectorAll('.win-btn').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                handleWindowControls(e.currentTarget, panel);
+            });
+        });
+    });
+
+    function startMove(e, panel, resizing) {
+        if (!dom.mainContainer.classList.contains('windowed-mode') || panel.classList.contains('is-maximized')) return;
+        e.preventDefault();
+        isResizing = resizing;
+        activePanel = panel;
+        panel.classList.add('is-dragging');
+        bringToFront(panel);
+        dragStartX = e.clientX; dragStartY = e.clientY;
+        initialX = panel.offsetLeft; initialY = panel.offsetTop;
+        initialW = panel.offsetWidth; initialH = panel.offsetHeight;
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onStopMove);
+    }
+    function onMove(e) {
+        if (!activePanel) return;
+        const dx = e.clientX - dragStartX; const dy = e.clientY - dragStartY;
+        if (isResizing) {
+            activePanel.style.width = `${initialW + dx}px`;
+            activePanel.style.height = `${initialH + dy}px`;
+        } else {
+            activePanel.style.left = `${initialX + dx}px`;
+            activePanel.style.top = `${initialY + dy}px`;
+        }
+    }
+    function onStopMove() {
+        if (!activePanel) return;
+        const state = windowStates[activePanel.id];
+        state.x = activePanel.offsetLeft; state.y = activePanel.offsetTop;
+        if(isResizing) {
+            state.width = activePanel.offsetWidth;
+            state.height = activePanel.offsetHeight;
+            if(activePanel.id === 'simulation-panel' || activePanel.id === 'data-panel') reset();
+        }
+        activePanel.classList.remove('is-dragging');
+        activePanel = null;
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onStopMove);
+    }
+    function bringToFront(panel) {
+        if (!dom.mainContainer.classList.contains('windowed-mode') || !windowStates[panel.id]) return;
+        let maxZ = 9;
+        Object.values(windowStates).forEach(s => { if(s && s.z) maxZ = Math.max(maxZ, s.z)});
+        windowStates[panel.id].z = maxZ + 1;
+        panel.style.zIndex = windowStates[panel.id].z;
+    }
+    function dockPanel(panel) { panel.style.cssText = ''; panel.classList.remove('is-minimized', 'is-maximized'); if(windowStates[panel.id]) windowStates[panel.id].docked = true; }
+    function undockPanel(panel) {
+        const state = windowStates[panel.id];
+        if(!state) return;
+        panel.style.left = `${state.x}px`; panel.style.top = `${state.y}px`;
+        panel.style.width = `${state.width}px`; panel.style.height = `${state.height}px`;
+        panel.style.zIndex = state.z;
+    }
+    function handleWindowControls(button, panel) {
+        const state = windowStates[panel.id];
+        if(button.classList.contains('dock')) {
+            dockPanel(panel);
+        } else if(button.classList.contains('minimize')) {
+            panel.classList.toggle('is-minimized');
+        } else if(button.classList.contains('maximize')) {
+            const isMaximized = panel.classList.contains('is-maximized');
+            if (isMaximized) { // Restore
+                panel.style.width = `${state.width}px`; panel.style.height = `${state.height}px`;
+                panel.style.left = `${state.x}px`; panel.style.top = `${state.y}px`;
+            } else { // Maximize
+                state.width = panel.offsetWidth; state.height = panel.offsetHeight;
+                state.x = panel.offsetLeft; state.y = panel.offsetTop;
+            }
+            panel.classList.toggle('is-maximized');
+            // Use a short timeout to allow the browser to apply the new dimensions before resetting the canvas
+            setTimeout(reset, 50);
+        }
+    }
+
+    // --- 5. INITIALIZATION ---
+    document.querySelectorAll('.control-card-title').forEach(header => {
+        header.addEventListener('click', () => {
+            header.parentElement.classList.toggle('is-open');
+        });
+    });
+    ['massWhite', 'massBlack', 'impactOffset', 'elasticitySlider'].forEach(id => {
+        dom[id].addEventListener('input', () => { if (!state.isRunning) reset(); });
+    });
+    dom.resetBtn.addEventListener('click', reset);
+    dom.startBtn.addEventListener('click', start);
+    
     reset();
+    window.addEventListener('resize', () => { 
+        windowStates = {};
+        if (!dom.mainContainer.classList.contains('windowed-mode')) {
+            reset(); 
+        }
+    });
+});
 </script>
 </body>
 </html>
