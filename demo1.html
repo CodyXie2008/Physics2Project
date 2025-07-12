@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>理论分析演示动画 (最终修复版)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+            --panel-bg: #ffffff;
+            --primary-text: #2c3e50;
+            --secondary-text: #7f8c8d;
+            --accent-color: #3498db;
+            --highlight-color: #e74c3c;
+        }
+        body {
+            font-family: 'Roboto', 'Noto Sans SC', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--primary-text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        .presentation-container {
+            width: 90%;
+            max-width: 1000px;
+            height: 90vh;
+            max-height: 700px;
+            background: var(--panel-bg);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .scene {
+            flex-grow: 1;
+            padding: 2rem 3rem;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        .scene.active {
+            display: flex;
+            animation: fadeIn 0.8s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .scene h2 { font-size: 2rem; margin-top: 0; color: var(--accent-color); }
+        .scene p { font-size: 1.2rem; line-height: 1.8; max-width: 90%; }
+        .scene .explanation {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            width: 100%;
+        }
+
+        canvas {
+            border-radius: 8px;
+            background: #fdfdfd;
+            border: 1px solid #e3e8ec;
+        }
+
+        .navigation {
+            flex-shrink: 0;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-top: 1px solid #e3e8ec;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nav-btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+        .nav-btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        .step-counter { font-size: 1rem; font-weight: 500; color: var(--secondary-text); }
+        
+        .formula {
+            font-family: 'Times New Roman', Times, serif; font-size: 1.5em; font-weight: bold;
+            padding: 1rem; background: #f8f9fa; border-radius: 8px; margin: 1rem 0;
+            border: 1px solid #e3e8ec; display: inline-block;
+        }
+        .highlight { color: var(--highlight-color); font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="presentation-container">
+        <div class="scene active" id="scene-1">
+            <h2>第一幕：深入分析，发现端倪</h2>
+            <p>我们再次进行<b>中心碰撞</b>实验，并仔细观察碰撞后的瞬间，一个微小的细节暴露了问题所在。</p>
+            <canvas id="canvas-1" width="600" height="300"></canvas>
+        </div>
+
+        <div class="scene" id="scene-2">
+            <h2>第二幕：真相——能量的“无声”损耗</h2>
+            <p>白球未能稳稳停下，说明碰撞并非<b>完全弹性</b>。微弱的形变导致了动能的损失。</p>
+            <div class="explanation">
+                <canvas id="canvas-2a" width="300" height="300"></canvas>
+                <canvas id="canvas-2b" width="300" height="300"></canvas>
+            </div>
+        </div>
+
+        <div class="scene" id="scene-3">
+             <h2>第三幕：优化实验，逼近理想</h2>
+             <p>为了提升实验准确性，我们需要尽可能减少能量损失。</p>
+             <canvas id="canvas-3" width="600" height="300"></canvas>
+        </div>
+
+        <div class="scene" id="scene-4">
+            <h2>最终结论</h2>
+            <p>经过理论分析与实验验证，我们得出结论：在现实的、高弹性的碰撞中，分离角度非常<b>接近90度</b>，但由于能量损失，通常会略小于这个理想值。</p>
+            <canvas id="canvas-4" width="600" height="300"></canvas>
+        </div>
+
+        <div class="navigation">
+            <button class="nav-btn" id="prevBtn">上一步</button>
+            <div class="step-counter" id="stepCounter">1 / 4</div>
+            <button class="nav-btn" id="nextBtn">下一步</button>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    let currentScene = 1;
+    const totalScenes = 4;
+    const scenes = document.querySelectorAll('.scene');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const stepCounter = document.getElementById('stepCounter');
+    let animationHandles = {};
+
+    function updateScene() {
+        Object.values(animationHandles).forEach(handle => cancelAnimationFrame(handle));
+        animationHandles = {};
+
+        scenes.forEach((scene, index) => {
+            scene.classList.toggle('active', (index + 1) === currentScene);
+        });
+        prevBtn.disabled = currentScene === 1;
+        nextBtn.disabled = currentScene === totalScenes;
+        stepCounter.textContent = `${currentScene} / ${totalScenes}`;
+        runSceneAnimation(currentScene);
+    }
+
+    nextBtn.addEventListener('click', () => { if (currentScene < totalScenes) { currentScene++; updateScene(); } });
+    prevBtn.addEventListener('click', () => { if (currentScene > 1) { currentScene--; updateScene(); } });
+
+    function runSceneAnimation(sceneNumber) {
+        switch(sceneNumber) {
+            case 1: animateScene1(); break;
+            case 2: animateScene2(); break;
+            case 3: animateScene3(); break;
+            case 4: animateScene4(); break;
+        }
+    }
+
+    const Ball = (x, y, vx, vy, radius, color, label) => ({ x, y, vx, vy, radius, color, label, startX: x, startY: y });
+
+    function drawBall(ctx, ball) {
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.fillStyle = ball.color;
+        ctx.fill();
+        ctx.strokeStyle = '#333';
+        ctx.stroke();
+        if(ball.label) {
+            ctx.fillStyle = ball.color === 'white' ? 'black' : 'white';
+            ctx.font = 'bold 20px Roboto';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(ball.label, ball.x, ball.y);
+        }
+    }
+
+    function drawVector(ctx, start, vec, scale, color) {
+        const end = { x: start.x + vec.x * scale, y: start.y + vec.y * scale };
+        ctx.save();
+        ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(end.x, end.y); ctx.stroke();
+        const angle = Math.atan2(vec.y * scale, vec.x * scale);
+        ctx.beginPath();
+        ctx.moveTo(end.x, end.y);
+        ctx.lineTo(end.x - 10 * Math.cos(angle - Math.PI / 6), end.y - 10 * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(end.x - 10 * Math.cos(angle + Math.PI / 6), end.y - 10 * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function animateScene1() {
+        const canvas = document.getElementById('canvas-1');
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width, h = canvas.height;
+        let whiteBall = Ball(150, h/2, 2, 0, 30, 'white', '1');
+        let blackBall = Ball(w - 200, h/2, 0, 0, 30, 'black', '2');
+        let collided = false;
+        let showClue = false;
+        
+        function loop() {
+            ctx.clearRect(0, 0, w, h);
+            if (!collided) {
+                whiteBall.x += whiteBall.vx;
+                if (whiteBall.x + whiteBall.radius >= blackBall.x - blackBall.radius) {
+                    collided = true;
+                    whiteBall.vx = 0.1; 
+                    blackBall.vx = 1.9;
+                    setTimeout(() => { if(currentScene === 1) showClue = true; }, 1000);
+                }
+            } else {
+                whiteBall.x += whiteBall.vx;
+                blackBall.x += blackBall.vx;
+            }
+            drawBall(ctx, whiteBall);
+            drawBall(ctx, blackBall);
+            if (showClue) {
+                ctx.save();
+                ctx.strokeStyle = 'var(--highlight-color)'; ctx.lineWidth = 3;
+                ctx.strokeRect(whiteBall.x - 40, whiteBall.y - 40, 80, 80);
+                ctx.font = "bold 80px sans-serif"; ctx.fillStyle = 'var(--highlight-color)';
+                ctx.fillText("💡", whiteBall.x + 60, whiteBall.y - 50);
+                ctx.font = "bold 20px 'Noto Sans SC'"; ctx.textAlign = 'center';
+                ctx.fillText("白球没有完全静止!", whiteBall.x, whiteBall.y + 70);
+                ctx.restore();
+            }
+            if (blackBall.x > w + blackBall.radius) {
+                whiteBall.x = whiteBall.startX; blackBall.x = blackBall.startX;
+                whiteBall.vx = 2; blackBall.vx = 0;
+                collided = false; showClue = false;
+            }
+            animationHandles[1] = requestAnimationFrame(loop);
+        }
+        loop();
+    }
+
+    function animateScene2() {
+        const canvasA = document.getElementById('canvas-2a');
+        const ctxA = canvasA.getContext('2d');
+        const wA = canvasA.width, hA = canvasA.height;
+        const canvasB = document.getElementById('canvas-2b');
+        const ctxB = canvasB.getContext('2d');
+        const wB = canvasB.width, hB = canvasB.height;
+        
+        let deformation = 0; let angleOffset = 0;
+        let direction = 1;
+        
+        function unifiedLoop() {
+            // Update state for both animations
+            deformation += 0.2 * direction;
+            angleOffset += 0.05 * direction;
+            if (deformation > 5 || deformation < 0) direction *= -1;
+
+            // Draw on canvas A (Deformation)
+            ctxA.clearRect(0, 0, wA, hA);
+            ctxA.save();
+            ctxA.translate(wA/2 - 25, hA/2); ctxA.scale(1 - deformation/100, 1 + deformation/100);
+            drawBall(ctxA, 0, 0, 25, 'white');
+            ctxA.restore();
+            ctxA.save();
+            ctxA.translate(wA/2 + 25, hA/2); ctxA.scale(1 - deformation/100, 1 + deformation/100);
+            drawBall(ctxA, 0, 0, 25, 'black');
+            ctxA.restore();
+            ctxA.textAlign = 'center'; ctxA.font = "bold 18px 'Noto Sans SC'";
+            ctxA.fillStyle = 'var(--primary-text)';
+            ctxA.fillText("微观形变 & 能量损失", wA/2, hA - 30);
+
+            // Draw on canvas B (Angle Deviation)
+            ctxB.clearRect(0, 0, wB, hB);
+            const origin = {x: 50, y: hB - 50};
+            const scale = 20;
+            const v1p = {x: 4, y: -4};
+            const v2p = {x: 3.5, y: 3.5};
+            const v1_prime_end = {x: origin.x + v1p.x * scale, y: origin.y + v1p.y * scale};
+            
+            ctxB.save();
+            ctxB.translate(v1_prime_end.x, v1_prime_end.y);
+            ctxB.rotate(-angleOffset * Math.PI / 180);
+            drawVector(ctxB, {x:0, y:0}, v2p, scale, "#27ae60");
+            ctxB.restore();
+            drawVector(ctxB, origin, v1p, scale, "#e74c3c");
+            
+            ctxB.textAlign = 'center'; ctxB.font = "bold 18px 'Noto Sans SC'";
+            ctxB.fillStyle = 'var(--primary-text)';
+            ctxB.fillText("角度偏差 (<90°)", wB/2, hB - 30);
+            
+            // Single animation handle for the scene
+            animationHandles[2] = requestAnimationFrame(unifiedLoop);
+        }
+        unifiedLoop();
+    }
+
+    function animateScene3() {
+        const canvas = document.getElementById('canvas-3');
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width, h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'var(--secondary-text)'; ctx.font = "bold 18px 'Noto Sans SC'";
+        ctx.fillText("优化前", 150, 50);
+        drawBall(ctx, 150, 120, 30, '#d2b48c', '大理石');
+        ctx.fillStyle = '#a0522d'; ctx.fillRect(50, 200, 200, 20);
+        ctx.font = "bold 80px sans-serif"; ctx.fillStyle = 'var(--accent-color)';
+        ctx.fillText("→", w/2, h/2 + 20);
+        ctx.fillStyle = 'var(--secondary-text)'; ctx.font = "bold 18px 'Noto Sans SC'";
+        ctx.fillText("优化后", 450, 50);
+        drawBall(ctx, 450, 120, 30, '#4682b4', '钢球');
+        ctx.fillStyle = '#e0e0e0'; ctx.fillRect(350, 200, 200, 20);
+        ctx.fillStyle = 'var(--primary-text)'; ctx.font = "18px 'Noto Sans SC'";
+        ctx.fillText("换用弹性系数更高的材料", w/2, h-60);
+        ctx.fillText("换用摩擦力更小的桌面", w/2, h-30);
+    }
+    
+    function animateScene4() {
+        const canvas = document.getElementById('canvas-4');
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width, h = canvas.height;
+        let whiteBall = Ball(w/2 - 100, h/2, 2.8, -2.8, 30, 'white');
+        let blackBall = Ball(w/2 - 100, h/2, 2.8, 2.8, 30, 'black');
+        let frame = 0;
+        function loop() {
+            frame++;
+            if (frame > 100) return;
+            ctx.clearRect(0, 0, w, h);
+            whiteBall.x += whiteBall.vx; whiteBall.y += whiteBall.vy;
+            blackBall.x += blackBall.vx; blackBall.y += blackBall.vy;
+            drawBall(ctx, whiteBall);
+            drawBall(ctx, blackBall);
+            
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(w/2-100, h/2); ctx.lineTo(whiteBall.x, whiteBall.y);
+            ctx.moveTo(w/2-100, h/2); ctx.lineTo(blackBall.x, blackBall.y);
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.setLineDash([5,5]); ctx.stroke();
+            ctx.font = "bold 30px Roboto"; ctx.fillStyle = 'var(--highlight-color)';
+            ctx.fillText("≈ 90°", w/2 + 70, h/2);
+            ctx.restore();
+            
+            animationHandles[4] = requestAnimationFrame(loop);
+        }
+        loop();
+    }
+
+    updateScene();
+});
+</script>
+</body>
+</html>

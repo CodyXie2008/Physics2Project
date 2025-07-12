@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>90°法则 - 理论分析演示动画</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --panel-bg: #ffffff;
+            --primary-text: #2c3e50;
+            --secondary-text: #7f8c8d;
+            --accent-color: #3498db;
+            --accent-hover: #5dade2;
+            --border-color: #e3e8ec;
+            --shadow: 0 8px 32px rgba(44, 62, 80, 0.1);
+            --v1-color: #3498db;
+            --v1p-color: #e74c3c;
+            --v2p-color: #27ae60;
+        }
+        body {
+            font-family: 'Roboto', 'Noto Sans SC', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--primary-text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        .presentation-container {
+            width: 90%;
+            max-width: 1000px;
+            height: 90vh;
+            max-height: 700px;
+            background: var(--panel-bg);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .scene {
+            flex-grow: 1;
+            padding: 2rem 3rem;
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        .scene.active {
+            display: flex;
+            animation: fadeIn 0.8s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .scene h2 { font-size: 2rem; margin-top: 0; color: var(--accent-color); }
+        .scene p { font-size: 1.2rem; line-height: 1.8; max-width: 80%; }
+        
+        .formula {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 1.8em;
+            font-weight: bold;
+            text-align: center;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border: 1px solid var(--border-color);
+            display: inline-block;
+        }
+        .formula .fade-out {
+            display: inline-block;
+            transition: opacity 1s, transform 1s;
+        }
+        .formula.simplified .fade-out {
+            opacity: 0.2;
+            transform: scale(0.5);
+        }
+
+        canvas {
+            border-radius: 8px;
+            background: #fdfdfd;
+            border: 1px solid var(--border-color);
+        }
+
+        .navigation {
+            flex-shrink: 0;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nav-btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .nav-btn:hover { background-color: var(--accent-hover); }
+        .nav-btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        .step-counter { font-size: 1rem; font-weight: 500; color: var(--secondary-text); }
+    </style>
+</head>
+<body>
+    <div class="presentation-container">
+        <div class="scene active" id="scene-1">
+            <h2>第一幕：实验设定</h2>
+            <p>我们来分析一个理想化的碰撞场景，并设定好我们的初始条件。</p>
+            <canvas id="canvas-1" width="600" height="300"></canvas>
+        </div>
+
+        <div class="scene" id="scene-2">
+            <h2>第二幕：动量守恒</h2>
+            <p>根据动量守恒定律，我们可以得到一个关键的<b>速度矢量关系</b>。</p>
+            <div class="formula" id="formula-momentum">
+                <span class="fade-out">m</span> <b>V</b> = <span class="fade-out">m</span> <b>V'₁</b> + <span class="fade-out">m</span> <b>V'₂</b>
+            </div>
+            <p>这意味着三个速度矢量可以构成一个闭合的<b>三角形</b>。</p>
+        </div>
+
+        <div class="scene" id="scene-3">
+             <h2>矢量三角形的诞生</h2>
+             <p>我们将碰撞后的速度矢量进行首尾相接，来验证动量守恒的几何意义。</p>
+             <canvas id="canvas-3" width="600" height="300"></canvas>
+        </div>
+
+        <div class="scene" id="scene-4">
+            <h2>第三幕：动能守恒</h2>
+            <p>由于是完全弹性碰撞，系统的总动能守恒。</p>
+             <div class="formula" id="formula-energy">
+                <span class="fade-out">½ M</span> v² = <span class="fade-out">½ M</span> v'₁² + <span class="fade-out">½ M</span> v'₂²
+            </div>
+            <p>简化后，我们得到了一个关于速度<b>大小</b>的方程。</p>
+        </div>
+
+        <div class="scene" id="scene-5">
+            <h2>第四幕：真相大白</h2>
+            <p>动量守恒构成了<b>形</b>（三角形），动能守恒决定了<b>数</b>（勾股定理）。</p>
+            <canvas id="canvas-5" width="600" height="300"></canvas>
+            <p style="font-weight:bold; font-size: 1.5rem; margin-top: 2rem;">V'₁ 与 V'₂ 的夹角必须是 90°！</p>
+        </div>
+
+        <div class="navigation">
+            <button class="nav-btn" id="prevBtn">上一步</button>
+            <div class="step-counter" id="stepCounter">1 / 5</div>
+            <button class="nav-btn" id="nextBtn">下一步</button>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- State Management ---
+    let currentScene = 1;
+    const totalScenes = 5;
+    const scenes = document.querySelectorAll('.scene');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const stepCounter = document.getElementById('stepCounter');
+
+    // --- Navigation ---
+    function updateScene() {
+        scenes.forEach((scene, index) => {
+            scene.classList.toggle('active', (index + 1) === currentScene);
+        });
+        prevBtn.disabled = currentScene === 1;
+        nextBtn.disabled = currentScene === totalScenes;
+        stepCounter.textContent = `${currentScene} / ${totalScenes}`;
+        runSceneAnimation(currentScene);
+    }
+
+    nextBtn.addEventListener('click', () => {
+        if (currentScene < totalScenes) {
+            currentScene++;
+            updateScene();
+        }
+    });
+
+    prevBtn.addEventListener('click', () => {
+        if (currentScene > 1) {
+            currentScene--;
+            updateScene();
+        }
+    });
+
+    // --- Scene Animations ---
+    function runSceneAnimation(sceneNumber) {
+        switch(sceneNumber) {
+            case 1: drawScene1(); break;
+            case 2: animateFormula('formula-momentum'); break;
+            case 3: drawScene3(); break;
+            case 4: animateFormula('formula-energy'); break;
+            case 5: drawScene5(); break;
+        }
+    }
+
+    function animateFormula(formulaId) {
+        const formula = document.getElementById(formulaId);
+        formula.classList.remove('simplified');
+        setTimeout(() => formula.classList.add('simplified'), 500);
+    }
+
+    // --- Drawing Functions ---
+    const colors = {
+        v1: 'var(--v1-color)',
+        v1p: 'var(--v1p-color)',
+        v2p: 'var(--v2p-color)',
+        text: 'var(--primary-text)'
+    };
+    
+    function drawBall(ctx, x, y, radius, color, label) {
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#333';
+        ctx.stroke();
+        ctx.fillStyle = color === 'white' ? 'black' : 'white';
+        ctx.font = 'bold 20px Roboto';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, x, y);
+    }
+    
+    function drawVector(ctx, start, vec, scale, color, label) {
+        const end = { x: start.x + vec.x * scale, y: start.y + vec.y * scale };
+        ctx.save();
+        ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3;
+        // Line
+        ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(end.x, end.y); ctx.stroke();
+        // Arrow head
+        const angle = Math.atan2(vec.y * scale, vec.x * scale);
+        ctx.beginPath();
+        ctx.moveTo(end.x, end.y);
+        ctx.lineTo(end.x - 12 * Math.cos(angle - Math.PI / 6), end.y - 12 * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(end.x - 12 * Math.cos(angle + Math.PI / 6), end.y - 12 * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+        // Label
+        ctx.fillStyle = color; ctx.font = "bold 24px 'Times New Roman'";
+        ctx.fillText(label, start.x + vec.x * scale * 0.5 + 10, start.y + vec.y * scale * 0.5 - 10);
+        ctx.restore();
+    }
+
+    // Scene 1: Initial Setup
+    function drawScene1() {
+        const canvas = document.getElementById('canvas-1');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        drawBall(ctx, 150, 150, 40, 'white', '1');
+        drawBall(ctx, 450, 150, 40, 'black', '2');
+
+        ctx.fillStyle = colors.text;
+        ctx.font = 'bold 20px Roboto';
+        ctx.textAlign = 'left';
+        ctx.fillText('质量 M, 速度 V', 80, 230);
+        ctx.fillText('质量 M, 静止', 390, 230);
+    }
+
+    // Scene 3: Draw Vector Triangle Step-by-Step
+    function drawScene3() {
+        const canvas = document.getElementById('canvas-3');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const scale = 30;
+        const origin = { x: 100, y: 150 };
+
+        // Mock collision results for visualization
+        const v1 = { x: 8, y: 0 };
+        const v1_prime = { x: 3, y: 4 };
+        const v2_prime = { x: 5, y: -4 };
+        
+        // Step-by-step drawing
+        setTimeout(() => {
+            drawVector(ctx, origin, v1, scale, colors.v1, "V");
+        }, 500);
+        setTimeout(() => {
+            const v1_end = {x: origin.x + v1.x * scale, y: origin.y + v1.y * scale};
+            drawVector(ctx, origin, v1_prime, scale, colors.v1p, "V'₁");
+        }, 1500);
+        setTimeout(() => {
+            const v1_prime_end = { x: origin.x + v1_prime.x * scale, y: origin.y + v1_prime.y * scale };
+            drawVector(ctx, v1_prime_end, v2_prime, scale, colors.v2p, "V'₂");
+        }, 2500);
+    }
+    
+    // Scene 5: The Conclusion
+    function drawScene5() {
+        const canvas = document.getElementById('canvas-5');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const scale = 35;
+        const origin = { x: 150, y: 200 };
+        
+        // Using vectors that form a perfect right angle
+        const v1_prime = { x: 4, y: -3 };
+        const v2_prime = { x: 3, y: 4 };
+        const v1 = { x: v1_prime.x + v2_prime.x, y: v1_prime.y + v2_prime.y }; // v1 is now {7, 1} - not a perfect hypotenuse. Let's fix this.
+        // Let v1' be {3, 4} and v2' be {4, -3}. Then |v1'|^2 = 25, |v2'|^2=25, |v1|^2 = 7^2+1^2=50. So v1^2 = v1'^2+v2'^2 holds.
+        const v1p_final = { x: 3, y: 4};
+        const v2p_final = { x: 4, y: -3};
+        const v1_final = { x: v1p_final.x + v2p_final.x, y: v1p_final.y + v2p_final.y };
+
+        const v1p_end = { x: origin.x + v1p_final.x * scale, y: origin.y + v1p_final.y * scale };
+        
+        // Draw the triangle instantly
+        drawVector(ctx, origin, v1p_final, scale, colors.v1p, "V'₁");
+        drawVector(ctx, v1p_end, v2p_final, scale, colors.v2p, "V'₂");
+        drawVector(ctx, origin, v1_final, scale, colors.v1, "V");
+        
+        // Animate the right angle symbol
+        setTimeout(() => {
+            ctx.save();
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 4;
+            const size = 15;
+            ctx.beginPath();
+            ctx.moveTo(v1p_end.x - size * Math.cos(Math.atan2(v1p_final.y, v1p_final.x)), v1p_end.y - size * Math.sin(Math.atan2(v1p_final.y, v1p_final.x)));
+            ctx.lineTo(v1p_end.x - size * Math.cos(Math.atan2(v1p_final.y, v1p_final.x)) + size*Math.sin(Math.atan2(v1p_final.y, v1p_final.x)), v1p_end.y - size * Math.sin(Math.atan2(v1p_final.y, v1p_final.x)) - size*Math.cos(Math.atan2(v1p_final.y, v1p_final.x)));
+            ctx.lineTo(v1p_end.x + size*Math.sin(Math.atan2(v1p_final.y, v1p_final.x)), v1p_end.y - size*Math.cos(Math.atan2(v1p_final.y, v1p_final.x)));
+            ctx.stroke();
+            ctx.restore();
+            
+            ctx.fillStyle = 'red';
+            ctx.font = 'bold 24px Roboto';
+            ctx.fillText("90°", v1p_end.x + 20, v1p_end.y + 20);
+        }, 1000);
+    }
+
+
+    // Initial setup
+    updateScene();
+});
+</script>
+</body>
+</html>
